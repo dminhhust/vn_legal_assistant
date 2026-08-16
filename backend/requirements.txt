@@ -1,0 +1,38 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-dotenv>=1.0
+
+# Data layer
+sqlalchemy>=2.0
+psycopg2-binary>=2.9   # Postgres driver for docker-compose/production; tests use SQLite instead
+
+# Legal corpus ingestion pipeline + crawler
+chromadb>=0.5
+numpy>=1.26
+requests>=2.31          # HTTP client for the legal-source crawler (app/ingestion/crawler.py)
+beautifulsoup4>=4.12    # HTML -> plain text conversion for crawled legal documents
+datasets>=2.19          # streams the tmquan/vbpl-vn HF dataset (app/ingestion/hf_dataset_loader.py)
+
+# Legal RAG + checklist generator
+rank-bm25>=0.2
+
+# Offline, quota-free embeddings (LocalSentenceTransformerEmbeddingProvider).
+# Runs an in-process model so a full ~158K-doc corpus ingest has no API
+# cost and no rate limit — see docs/DEBUGGING_LOOP_LOG.md Iteration 11.
+# The pip-installed `torch` wheel on linux-x86_64 is the CPU build (no
+# CUDA) automatically; do NOT add a CUDA index here.
+sentence-transformers>=2.7
+torch>=2.2
+
+# LLM provider SDKs. The Model Router only imports the adapter for a
+# provider when that provider actually has a key configured (see
+# app/llm/router.py:_get_adapter), but installing all three up front
+# keeps the fallback path usable without a second install step.
+anthropic>=0.40
+openai>=1.50
+google-genai>=0.3
+
+# Testing
+pytest>=8.3
+httpx>=0.27

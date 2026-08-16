@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vn_legal_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `depends_on: [postgres]` alone only waits for the CONTAINER to
+      # start, not for Postgres to finish initializing and accept
+      # connections — on a first run (empty pgdata volume), Postgres
+      # runs a post-bootstrap init step that takes a few seconds, and
+      # the backend's migrate step raced it and crashed with
+      # "Connection refused" before this healthcheck was added. Found
+      # by actually running `docker compose up`, which this project's
+      # own sandbox verification couldn't do (no Docker available
+      # there) — see docs/ARCHITECTURE.md §9.
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+    healthcheck:
+      # Same class of race as postgres, for the same reason — the
+      # backend's HybridRetriever/VectorStoreWriter connect to Chroma
+      # on first real use, and shouldn't get a chance to race an
+      # unready Chroma either.
+      #
+      # NOTE: this used to shell out to `python -c "import urllib..."`,
+      # on the assumption that since chromadb is a Python app, a
+      # Python interpreter must be on PATH. That assumption is wrong:
+      # the published chromadb/chroma image is a slim distribution
+      # that ships neither python nor curl/wget — only the compiled
+      # server process itself plus bash. The healthcheck command was
+      # therefore failing to even execute (exec format/not found),
+      # which Docker reports as unhealthy, regardless of whether
+      # Chroma itself had started. Use bash's /dev/tcp instead, which
+      # needs no binaries beyond bash. Invoked via /bin/bash directly
+      # (not the image's default shell) since /dev/tcp is a bash
+      # builtin and may not exist under sh.
+      test: ["CMD", "/bin/bash", "-c", "echo > /dev/tcp/localhost/8000"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/app:/app/app  # live-reload friendly for local dev
+      # Persist the Hugging Face cache (the local embedding model + the
+      # streamed vbpl-vn dataset) across container rebuilds/recreates —
+      # otherwise a `docker compose up --build` re-downloads the model.
+      - hf-cache:/root/.cache/huggingface
+    command: sh -c "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+
+volumes:
+  pgdata:
+  chromadata:
+  hf-cache:

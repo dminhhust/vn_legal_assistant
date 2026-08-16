@@ -1,0 +1,42 @@
+SAMPLE TEST FIXTURE — SYNTHETIC TEXT, NOT A REAL LAW.
+This file exists ONLY to test the ingestion pipeline's structural
+parsing and chunking logic (Chương/Điều/Khoản boundary detection).
+Every "obligation" described below is fictional and invented purely to
+exercise the parser/chunker. Do NOT treat any content below as real
+legal information, and do NOT use it to answer a real person's
+question about Vietnamese law.
+
+Chương I
+QUY ĐỊNH CHUNG MẪU (SAMPLE GENERAL PROVISIONS — FICTIONAL)
+
+Điều 1. Mục đích thử nghiệm (Fictional test purpose)
+1. Văn bản mẫu này được tạo ra chỉ để kiểm thử phần mềm phân tích cấu trúc văn bản pháp luật.
+2. Mọi nội dung trong văn bản này đều là hư cấu và không có giá trị pháp lý thực tế.
+
+Điều 2. Đối tượng áp dụng mẫu (Fictional scope)
+1. Áp dụng cho các thực thể thử nghiệm mẫu được định nghĩa riêng cho mục đích kiểm thử phần mềm.
+2. Không áp dụng cho bất kỳ cá nhân hoặc tổ chức thực tế nào ngoài đời.
+
+Chương II
+NGHĨA VỤ MẪU (SAMPLE OBLIGATIONS — FICTIONAL, FOR PIPELINE TESTING ONLY)
+
+Điều 3. Nghĩa vụ báo cáo mẫu hằng năm (Fictional annual sample-report obligation)
+1. Thực thể thử nghiệm mẫu phải nộp báo cáo thử nghiệm mẫu trước ngày 31 tháng 3 hằng năm.
+2. Báo cáo thử nghiệm mẫu bao gồm các nội dung sau:
+a) Thông tin thử nghiệm mẫu số một;
+b) Thông tin thử nghiệm mẫu số hai;
+c) Thông tin thử nghiệm mẫu số ba.
+3. Trường hợp không nộp báo cáo thử nghiệm mẫu đúng hạn, thực thể thử nghiệm mẫu sẽ bị xử lý theo quy định thử nghiệm mẫu riêng.
+
+Điều 4. Nghĩa vụ đăng ký mẫu cho tổ chức thử nghiệm (Fictional registration obligation for sample test organizations)
+1. Tổ chức thử nghiệm mẫu có hoạt động thử nghiệm mẫu phải đăng ký với cơ quan thử nghiệm mẫu trong thời hạn ba mươi ngày kể từ ngày bắt đầu hoạt động thử nghiệm mẫu.
+2. Hồ sơ đăng ký thử nghiệm mẫu bao gồm:
+a) Đơn đăng ký thử nghiệm mẫu;
+b) Giấy tờ thử nghiệm mẫu liên quan đến thực thể thử nghiệm mẫu.
+
+Điều 5. Điều khoản dài để kiểm thử việc chia nhỏ (Long fictional article — tests the sub-chunker fallback)
+1. Đây là khoản một của điều thử nghiệm dài, được viết dài ra một cách có chủ đích để tổng độ dài của toàn bộ điều luật vượt quá ngưỡng số ký tự tối đa cho phép của một đoạn nhúng, nhằm buộc bộ chia nhỏ phải kích hoạt cơ chế dự phòng chia theo ranh giới khoản thay vì giữ nguyên toàn bộ điều luật trong một đoạn duy nhất, đây vẫn là nội dung hư cấu hoàn toàn, được lặp lại và mở rộng thêm để chắc chắn vượt ngưỡng độ dài kiểm thử đã đặt ra cho hệ thống.
+2. Đây là khoản hai của điều thử nghiệm dài, cũng được viết dài tương tự như khoản một, tiếp tục là nội dung hư cấu hoàn toàn chỉ nhằm mục đích kiểm thử phần mềm phân tích và chia nhỏ văn bản pháp luật mẫu, không mang giá trị pháp lý thực tế nào cả, và được mở rộng thêm một chút nữa để đảm bảo tổng độ dài đủ lớn cho mục đích kiểm thử.
+3. Đây là khoản ba của điều thử nghiệm dài, tiếp tục được viết dài ra một cách có chủ đích tương tự hai khoản trước, vẫn là nội dung hư cấu hoàn toàn chỉ dùng để kiểm thử ranh giới chia nhỏ theo khoản của bộ chia nhỏ phân cấp trong hệ thống thử nghiệm phần mềm, và cũng được viết thêm để bảo đảm độ dài kiểm thử.
+4. Đây là khoản bốn của điều thử nghiệm dài, được viết dài tương tự các khoản trước đó, nội dung hoàn toàn hư cấu và chỉ phục vụ mục đích kiểm thử kỹ thuật chia nhỏ văn bản theo ranh giới khoản của hệ thống, được bổ sung thêm câu chữ để tăng độ dài tổng thể một cách rõ ràng.
+5. Đây là khoản năm và là khoản cuối cùng của điều thử nghiệm dài này, một lần nữa khẳng định toàn bộ nội dung của điều luật mẫu này đều là hư cấu và chỉ được tạo ra để kiểm thử phần mềm, không phản ánh bất kỳ quy định pháp luật thực tế nào, và được viết thêm một đoạn cuối để chắc chắn vượt ngưỡng độ dài mặc định của bộ chia nhỏ.
