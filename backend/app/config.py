@@ -20,3 +20,8 @@ DATABASE_URL = os.getenv(
 )
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+# Single-container deployments (root Dockerfile / HF Spaces) run Chroma
+# in embedded PersistentClient mode — file-backed, no separate server.
+# Set CHROMA_EMBEDDED_DIR (e.g. /data/chroma) to enable it; unset keeps
+# the legacy HTTP-client mode used by docker-compose.
+CHROMA_EMBEDDED_DIR = os.getenv("CHROMA_EMBEDDED_DIR") or None

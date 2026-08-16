@@ -32,10 +32,14 @@ import argparse
 import logging
 from pathlib import Path
 
+from app.ingestion.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_document
 from app.ingestion.crawler import VbplGatewayCrawler
+from app.ingestion.embeddings import EmbeddingProvider, get_default_embedding_provider
 from app.ingestion.hf_dataset_loader import HfVbplDatasetLoader
-from app.ingestion.metadata import SourceMeta
+from app.ingestion.metadata import SourceMeta, build_metadata
+from app.ingestion.parser import parse_document
 from app.ingestion.pipeline import ingest_document
+from app.ingestion.vector_store import VectorStoreWriter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -113,6 +117,64 @@ def crawl_and_ingest_hf_dataset(max_documents: int | None) -> list[dict]:
     return results
 
 
+_BATCH_FLUSH_SIZE = 500
+_PROGRESS_LOG_EVERY = 500
+
+
+def ingest_hf_dataset_batched(
+    max_documents: int | None = None,
+    *,
+    vector_store: VectorStoreWriter | None = None,
+    embedder: EmbeddingProvider | None = None,
+    flush_size: int = _BATCH_FLUSH_SIZE,
+) -> dict:
+    """Streams the HF dataset and writes chunks through
+    `VectorStoreWriter.upsert_chunks_batched` — the path for the FULL
+    ~158K-doc corpus. The per-document `ingest_document` path issues one
+    Chroma `get()` per chunk for its content-hash dedup check, which is
+    hours of wall time at ~500K chunks (see `upsert_chunks_batched`'s
+    own docstring); batching makes it a few hundred round-trips instead.
+
+    Idempotent end to end: already-ingested chunks are skipped via the
+    same content-hash diffing, so an interrupted run can simply be
+    re-run and it resumes rather than re-does. One `VectorStoreWriter`
+    and one `EmbeddingProvider` are built once and shared across all
+    documents (the per-document path re-constructs both per doc).
+
+    Returns aggregate counts (documents seen, chunks written/skipped)
+    for the whole run."""
+    loader = HfVbplDatasetLoader()
+    store = vector_store or VectorStoreWriter()
+    embed_provider = embedder or get_default_embedding_provider()
+
+    stats = {"documents": 0, "chunks": 0, "written": 0, "skipped": 0}
+    pending: list[tuple[Chunk, dict]] = []
+
+    def flush() -> None:
+        if not pending:
+            return
+        result = store.upsert_chunks_batched(pending, embed_provider, flush_size=flush_size)
+        stats["written"] += result["written"]
+        stats["skipped"] += result["skipped"]
+        pending.clear()
+
+    for doc in loader.crawl(max_documents=max_documents):
+        document = parse_document(doc.doc_id, doc.title, doc.raw_text)
+        chunks = chunk_document(document, max_chars=DEFAULT_MAX_CHARS)
+        stats["documents"] += 1
+        for chunk in chunks:
+            pending.append((chunk, build_metadata(chunk, doc.source)))
+            stats["chunks"] += 1
+        if len(pending) >= flush_size:
+            flush()
+        if stats["documents"] % _PROGRESS_LOG_EVERY == 0:
+            logger.info("ingestion progress: %s", stats)
+
+    flush()
+    logger.info("ingestion complete: %s", stats)
+    return stats
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -129,14 +191,33 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max-documents", type=int, default=10, help="Cap on how many real documents to ingest (with --crawl or --hf-dataset)."
     )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="No cap on documents (with --hf-dataset) — ingest the entire corpus.",
+    )
+    parser.add_argument(
+        "--batched",
+        action="store_true",
+        help="(with --hf-dataset) Write chunks in batches via upsert_chunks_batched instead of per-document ingest_document — required for the full ~500K-chunk corpus.",
+    )
     args = parser.parse_args()
 
     if args.crawl:
         outcome = crawl_and_ingest_real_documents(args.max_documents)
         print(f"Crawled and ingested {len(outcome)} real document(s) from the live gateway.")
     elif args.hf_dataset:
-        outcome = crawl_and_ingest_hf_dataset(args.max_documents)
-        print(f"Ingested {len(outcome)} real document(s) from the tmquan/vbpl-vn dataset.")
+        max_documents = None if args.full else args.max_documents
+        if args.batched:
+            outcome = ingest_hf_dataset_batched(max_documents)
+            print(
+                f"Ingested from the tmquan/vbpl-vn dataset: {outcome['documents']} "
+                f"document(s), {outcome['written']} chunk(s) written, "
+                f"{outcome['skipped']} skipped."
+            )
+        else:
+            outcome = crawl_and_ingest_hf_dataset(max_documents)
+            print(f"Ingested {len(outcome)} real document(s) from the tmquan/vbpl-vn dataset.")
     else:
         result = ingest_sample_fixture()
         print(result)

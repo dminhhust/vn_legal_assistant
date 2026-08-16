@@ -19,6 +19,7 @@ a real database.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,24 @@ from pathlib import Path
 import pytest
 
 EXPECTED_TABLES = {"users", "profiles", "profile_history", "trait_tags", "obligation_checklist_items"}
+
+
+def _fresh_process_env(db_path: Path) -> dict:
+    """Env for the subprocess: the parent's env plus the SQLite
+    DATABASE_URL.
+
+    The original version passed a bare `{"DATABASE_URL": ...,
+    "PATH": "/usr/bin:/bin"}` — on Linux that keeps the child's
+    environment deterministic, but on Windows replacing the whole
+    environment breaks Python's own startup (winsock/_overlapped fails
+    with WinError 10106 because SystemRoot and the system DLL search
+    path are gone). Inherit the parent env and override instead; keep
+    the PATH pinning on POSIX only."""
+    env = dict(os.environ)
+    env["DATABASE_URL"] = f"sqlite:///{db_path}"
+    if os.name == "posix":
+        env["PATH"] = "/usr/bin:/bin"
+    return env
 
 
 def test_init_db_creates_all_tables_in_a_fresh_process():
@@ -41,7 +60,7 @@ def test_init_db_creates_all_tables_in_a_fresh_process():
         )
         result = subprocess.run(
             [sys.executable, "-c", script],
-            env={"DATABASE_URL": f"sqlite:///{db_path}", "PATH": "/usr/bin:/bin"},
+            env=_fresh_process_env(db_path),
             cwd=str(Path(__file__).resolve().parent.parent),
             capture_output=True,
             text=True,

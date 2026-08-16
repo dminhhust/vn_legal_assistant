@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 import chromadb
 
-from app.config import CHROMA_HOST, CHROMA_PORT
+from app.config import CHROMA_EMBEDDED_DIR, CHROMA_HOST, CHROMA_PORT
 from app.ingestion.chunker import Chunk
 from app.ingestion.embeddings import EmbeddingProvider
 from app.ingestion.metadata import SourceMeta, build_metadata
@@ -24,6 +24,21 @@ from app.ingestion.metadata import SourceMeta, build_metadata
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "legal_corpus"
+
+
+def _build_default_client() -> chromadb.ClientAPI:
+    """Default Chroma client for production paths. Embedded
+    `PersistentClient` (file-backed, no separate server) when
+    `CHROMA_EMBEDDED_DIR` is set — the single-container deployment mode
+    (see app/config.py) — otherwise the HTTP client against the
+    standalone `chroma` service from docker-compose."""
+    if CHROMA_EMBEDDED_DIR:
+        logger.info(
+            "Using embedded Chroma PersistentClient (data dir: %s)", CHROMA_EMBEDDED_DIR
+        )
+        return chromadb.PersistentClient(path=CHROMA_EMBEDDED_DIR)
+    logger.info("Using Chroma HTTP client at %s:%s", CHROMA_HOST, CHROMA_PORT)
+    return chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
 
 # IMPORTANT — discovered via testing, not from Chroma's docs: separate
 # chromadb.EphemeralClient() instances in the same process can share
@@ -39,7 +54,7 @@ COLLECTION_NAME = "legal_corpus"
 
 class VectorStoreWriter:
     def __init__(self, client: Optional[Any] = None, collection_name: str = COLLECTION_NAME):
-        self._client = client or chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+        self._client = client or _build_default_client()
         self._collection = self._client.get_or_create_collection(collection_name)
 
     def upsert_chunks(
