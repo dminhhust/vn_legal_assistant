@@ -1,6 +1,6 @@
 ---
 title: VN Legal Assistant — MVP
-emoji: 🇻🇳
+emoji: ⚖️
 colorFrom: blue
 colorTo: green
 sdk: docker
