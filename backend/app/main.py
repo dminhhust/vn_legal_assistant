@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.chat.router import router as chat_router
 from app.llm.router import NoProviderAvailableError, get_router
@@ -29,6 +30,19 @@ from app.rag.router import router as checklist_router
 configure_logging(level=logging.INFO)
 
 app = FastAPI(title="VN Legal Assistant — MVP API", version="0.1.0")
+
+# Permissive CORS for deployments where the React frontend is served
+# from a different origin than the backend (e.g. a separate static
+# host). The nginx-proxied single-container and docker-compose shapes
+# never trigger CORS (same-origin /api), but allowing it keeps the
+# frontend deployable anywhere without backend changes.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(RequestIDMiddleware)
 app.include_router(profile_router)
 app.include_router(checklist_router)

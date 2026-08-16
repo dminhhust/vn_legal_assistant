@@ -1,7 +1,7 @@
 #!/bin/bash
 # Single-container entrypoint: database migrate, background corpus
 # ingestion (if the vector store is empty), then FastAPI backend +
-# Streamlit frontend in the same container.
+# nginx (React bundle + /api proxy) in the same container.
 #
 # Env contract (see the root Dockerfile for defaults):
 #   DATA_DIR          where SQLite, Chroma data and logs live (persist this)
@@ -9,9 +9,10 @@
 #   CHROMA_EMBEDDED_DIR  embedded Chroma data dir (default /data/chroma)
 #   EMBEDDING_PROVIDER   auto|openai|gemini|local|hashing (default local)
 #   BACKEND_PORT      uvicorn port (default 8080)
-#   FRONTEND_PORT     streamlit port; falls back to $PORT when set
+#   FRONTEND_PORT     nginx port; falls back to $PORT when set
 #                     (HF Spaces convention) — default 8501
-#   BACKEND_URL       URL the frontend calls (default http://localhost:8080)
+#   BACKEND_PROXY     backend URL nginx forwards /api to (default
+#                     http://127.0.0.1:8080 — same container)
 set -e
 
 mkdir -p "$DATA_DIR"
@@ -45,17 +46,17 @@ nohup uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" \
     > "$DATA_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
-echo "=== [4/5] Starting frontend (streamlit :$FRONTEND_PORT) ==="
-cd /app/frontend
-nohup streamlit run streamlit_app.py \
-    --server.address 0.0.0.0 --server.port "$FRONTEND_PORT" \
-    > "$DATA_DIR/frontend.log" 2>&1 &
-FRONTEND_PID=$!
+echo "=== [4/5] Configuring nginx (frontend :$FRONTEND_PORT, /api -> $BACKEND_PROXY) ==="
+envsubst '${FRONTEND_PORT} ${BACKEND_PROXY}' \
+    < /etc/nginx/templates/default.conf.template \
+    > /etc/nginx/conf.d/default.conf
+nginx -g 'daemon off;' > "$DATA_DIR/nginx.log" 2>&1 &
+NGINX_PID=$!
 
-trap 'kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true' EXIT INT TERM
+trap 'kill $BACKEND_PID $NGINX_PID 2>/dev/null || true' EXIT INT TERM
 
-echo "=== [5/5] Services up (backend pid $BACKEND_PID, frontend pid $FRONTEND_PID) ==="
+echo "=== [5/5] Services up (backend pid $BACKEND_PID, nginx pid $NGINX_PID) ==="
 # Wait on the servers only — the background ingestion is fire-and-forget:
 # if it crashes, the app stays up (degraded retrieval) and the crash is
 # visible in ingestion.log.
-wait $BACKEND_PID $FRONTEND_PID
+wait $BACKEND_PID $NGINX_PID
